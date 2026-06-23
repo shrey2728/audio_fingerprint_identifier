@@ -47,6 +47,7 @@ filename without extension), downloadable directly from the app.
 
 ## Deploying on Streamlit Community Cloud
 App URL -> https://audiofingerprintidentifier-mwzf7xbdkxskcwyv8vl6qm.streamlit.app/
+github repo -> https://github.com/shrey2728/audio_fingerprint_identifier.git
 ## Notes
 
 - The identification logic, hash format, and default parameters are
