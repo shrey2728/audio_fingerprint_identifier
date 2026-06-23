@@ -1,4 +1,3 @@
-# audio_fingerprint_identifier
 # EE200 Q3-B — Audio Fingerprint Identifier (Streamlit app)
 
 A Shazam-style song identifier wrapped in a small interactive app. The
