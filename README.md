@@ -46,31 +46,7 @@ exactly two columns: `filename, prediction` (prediction = matched song's
 filename without extension), downloadable directly from the app.
 
 ## Deploying on Streamlit Community Cloud
-
-1. Create a new GitHub repo and push these files:
-   ```bash
-   git init
-   git add app.py engine.py fingerprint_db.pkl requirements.txt packages.txt README.md
-   git commit -m "EE200 Q3-B fingerprinting app"
-   git branch -M main
-   git remote add origin <your-repo-url>
-   git push -u origin main
-   ```
-   **Do not push the `songs/` folder** — it's ~370 MB of mp3s and is not
-   needed at runtime (the app only needs `fingerprint_db.pkl`, ~49 MB,
-   which is under GitHub's 100 MB per-file limit). If you want to keep the
-   audio files in the repo for completeness, use [Git LFS](https://git-lfs.com/)
-   or a `.gitignore` entry for `songs/` and host them separately.
-2. Go to [share.streamlit.io](https://share.streamlit.io), sign in with
-   GitHub, and click "New app".
-3. Pick your repo, branch `main`, and main file path `app.py`.
-4. Click "Deploy". Streamlit Cloud will read `requirements.txt` (Python
-   packages) and `packages.txt` (system packages — installs `ffmpeg`)
-   automatically, then start the app. First boot takes a minute or two
-   while it loads `fingerprint_db.pkl`.
-5. Once live, the URL it gives you (`https://<your-app>.streamlit.app`) is
-   what you submit.
-
+App URL -> https://audiofingerprintidentifier-mwzf7xbdkxskcwyv8vl6qm.streamlit.app/
 ## Notes
 
 - The identification logic, hash format, and default parameters are
