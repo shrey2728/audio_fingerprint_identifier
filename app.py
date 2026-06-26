@@ -38,7 +38,7 @@ from engine import (
 # Page setup
 # -----------------------------------------------------------------------
 st.set_page_config(
-    page_title="Audio Fingerprint Identifier",
+    page_title="Zapptain America’",
     page_icon="🎵",
     layout="wide",
 )
@@ -197,7 +197,7 @@ def run_identification(y, sr, db, params=DEFAULT_PARAMS):
 # -----------------------------------------------------------------------
 # Sidebar / Shared State Layout
 # -----------------------------------------------------------------------
-st.title("🎵 Audio Fingerprint Identifier")
+st.title("🎵 Zapptain America’")
 st.caption(
     "A from-scratch Shazam-style song identifier: spectrogram → constellation map → "
     "paired-hash fingerprints → offset-histogram matching. (EE200 Q3-B)"
