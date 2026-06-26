@@ -21,6 +21,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import streamlit as st
+from scipy.interpolate import interp1d
 
 from engine import (
     DEFAULT_PARAMS,
@@ -63,6 +64,44 @@ def get_database():
     db.save(DB_PATH)
     progress_bar.empty()
     return db
+
+
+# =========================================================================
+# GLOBAL ROBUSTNESS HELPER FUNCTIONS
+# =========================================================================
+
+def add_white_noise(y, noise_level_db):
+    """
+    Adds additive white Gaussian noise to the query waveform based on target dB level.
+    If noise_level_db <= -80, the audio is considered clean and left unaltered.
+    """
+    if noise_level_db <= -80:
+        return y
+    
+    sig_power = np.mean(y ** 2)
+    if sig_power == 0:
+        sig_power = 1e-6
+        
+    noise_power = 10 ** (noise_level_db / 10.0)
+    noise = np.random.normal(0, np.sqrt(noise_power), len(y))
+    return y + noise
+
+
+def apply_pitch_shift(y, sr, semitones):
+    """
+    Applies a simple time-domain resampling pitch shift.
+    Resampling changes pitch and duration concurrently, accurately modeling 
+    analog speed/pitch variations common in real-world environments.
+    """
+    if semitones == 0:
+        return y
+    
+    factor = 2.0 ** (semitones / 12.0)
+    x_old = np.arange(len(y))
+    x_new = np.arange(0, len(y), factor)
+    
+    f_interp = interp1d(x_old, y, kind='linear', fill_value="extrapolate")
+    return f_interp(x_new)
 
 
 def plot_spectrogram(S_db, freqs, times, title, max_freq=5000):
@@ -156,7 +195,7 @@ def run_identification(y, sr, db, params=DEFAULT_PARAMS):
 
 
 # -----------------------------------------------------------------------
-# Sidebar / shared state
+# Sidebar / Shared State Layout
 # -----------------------------------------------------------------------
 st.title("🎵 Audio Fingerprint Identifier")
 st.caption(
@@ -182,6 +221,31 @@ with st.sidebar.expander("Show indexed songs"):
 
 mode = st.sidebar.radio("Mode", ["Single-clip mode", "Batch mode"])
 
+# =========================================================================
+# GLOBAL ROBUSTNESS TESTING PANEL (Defined exactly once here)
+# =========================================================================
+st.sidebar.divider()
+st.sidebar.header("Robustness Testing Panel")
+st.sidebar.markdown("Manipulate channel conditions to see how the algorithm handles impairments:")
+
+noise_level = st.sidebar.slider(
+    "Additive White Noise (dB)", 
+    min_value=-80, 
+    max_value=0, 
+    value=-80, 
+    step=5,
+    help="Set to -80 for standard clean audio. Higher values add more heavy noise."
+)
+
+pitch_semitones = st.sidebar.slider(
+    "Pitch Shift (Semitones)", 
+    min_value=-3, 
+    max_value=3, 
+    value=0, 
+    step=1,
+    help="Positive values raise pitch and slightly speed up playback. Negative values lower them."
+)
+
 st.sidebar.divider()
 st.sidebar.caption(
     "Fingerprinting parameters (fixed, matching the report):\n\n"
@@ -193,102 +257,7 @@ st.sidebar.caption(
     f"- Min peak loudness: {DEFAULT_PARAMS['min_amp_db']} dB\n"
     f"- Fan-out: {DEFAULT_PARAMS['fan_out']} pairs/anchor"
 )
-import numpy as np
-import streamlit as st
-from scipy.interpolate import interp1d
 
-# =========================================================================
-# 1. ADD ROBUSTNESS HELPER FUNCTIONS
-# =========================================================================
-
-def add_white_noise(y, noise_level_db):
-    """
-    Adds additive white Gaussian noise to the query waveform based on target dB level.
-    If noise_level_db <= -80, the audio is considered clean and left unaltered.
-    """
-    if noise_level_db <= -80:
-        return y
-    
-    # Calculate power of the input audio signal
-    sig_power = np.mean(y ** 2)
-    if sig_power == 0:
-        sig_power = 1e-6
-        
-    # Translate target dB level to relative noise power variance
-    noise_power = 10 ** (noise_level_db / 10.0)
-    noise = np.random.normal(0, np.sqrt(noise_power), len(y))
-    return y + noise
-
-def apply_pitch_shift(y, sr, semitones):
-    """
-    Applies a simple time-domain resampling pitch shift.
-    Resampling changes pitch and duration concurrently, accurately modeling 
-    analog speed/pitch variations common in real-world environments.
-    """
-    if semitones == 0:
-        return y
-    
-    # Calculate resampling conversion factor
-    factor = 2.0 ** (semitones / 12.0)
-    
-    x_old = np.arange(len(y))
-    x_new = np.arange(0, len(y), factor)
-    
-    # Interpolate across the resampled timeline
-    f_interp = interp1d(x_old, y, kind='linear', fill_value="extrapolate")
-    return f_interp(x_new)
-
-
-# =========================================================================
-# 2. RENDER THE INTERACTIVE SIDEBAR PANELS
-# =========================================================================
-
-st.sidebar.header("Robustness Testing Panel")
-st.sidebar.markdown("Manipulate channel conditions to see how the algorithm handles impairments:")
-
-# Interactive White Noise injection slider
-noise_level = st.sidebar.slider(
-    "Additive White Noise (dB)", 
-    min_value=-80, 
-    max_value=0, 
-    value=-80, 
-    step=5,
-    help="Set to -80 for standard clean audio. Higher values add more heavy noise."
-)
-
-# Interactive Pitch Shift slider 
-pitch_semitones = st.sidebar.slider(
-    "Pitch Shift (Semitones)", 
-    min_value=-3, 
-    max_value=3, 
-    value=0, 
-    step=1,
-    help="Positive values raise pitch and slightly speed up playback. Negative values lower them."
-)
-
-
-# =========================================================================
-# 3. INTERCEPT AND PREPROCESS THE AUDIO PIPELINE
-# =========================================================================
-
-# Locate the segment where you fetch your query waveform array, for example:
-# y, sr = load_audio(uploaded_file, offset=query_offset, duration=query_duration)
-
-if 'y' in locals() and y is not None:
-    # 1. Apply any selected Pitch Shift modifications first
-    if pitch_semitones != 0:
-        y = apply_pitch_shift(y, sr, pitch_semitones)
-        st.write(f"🔄 **Applied Pitch Shift Mod:** {pitch_semitones} semitone(s)")
-
-    # 2. Mix in Additive White Gaussian Noise
-    if noise_level > -80:
-        y = add_white_noise(y, noise_level)
-        st.write(f"🔊 **Injected Noise Level:** {noise_level} dB")
-        
-    # --- Now proceed with your standard fingerprint matching below ---
-    # S_db = compute_spectrogram(y, ...)
-    # freq_idx, time_idx = find_constellation_peaks(S_db, ...)
-    # ...
 # -----------------------------------------------------------------------
 # Single-clip mode
 # -----------------------------------------------------------------------
@@ -307,6 +276,16 @@ if mode == "Single-clip mode":
         with st.spinner("Decoding and fingerprinting the clip..."):
             try:
                 y, sr = load_audio_bytes(audio_bytes, sr=DEFAULT_PARAMS["sr"])
+                
+                # --- APPLY THE ROBUSTNESS PIPELINE ON SINGLE AUDIO ---
+                if pitch_semitones != 0:
+                    y = apply_pitch_shift(y, sr, pitch_semitones)
+                    st.info(f"🔄 **Applied Pitch Shift Mod:** {pitch_semitones} semitone(s)")
+                
+                if noise_level > -80:
+                    y = add_white_noise(y, noise_level)
+                    st.info(f"🔊 **Injected Noise Level:** {noise_level} dB")
+                    
             except Exception as e:
                 st.error(f"Could not decode this file: {e}")
                 st.stop()
@@ -332,10 +311,10 @@ if mode == "Single-clip mode":
 
             st.subheader("🎯 Identified song")
             if confident:
-                st.success(f"**{best['song_name']}**  (score={best['score']}, computed in {elapsed*1000:.0f} ms)")
+                st.success(f"**{best['song_name']}** (score={best['score']}, computed in {elapsed*1000:.0f} ms)")
             else:
                 st.warning(
-                    f"Best guess: **{best['song_name']}**  (score={best['score']}) — "
+                    f"Best guess: **{best['song_name']}** (score={best['score']}) — "
                     "but the match is weak/ambiguous; try a longer or cleaner clip."
                 )
 
@@ -406,7 +385,6 @@ else:
     )
 
     if uploaded_files:
-        # expand any .zip uploads into individual (filename, bytes) pairs
         clips = []
         for f in uploaded_files:
             if f.name.lower().endswith(".zip"):
@@ -427,6 +405,14 @@ else:
                 status.write(f"Processing `{name}` ({i+1}/{len(clips)})...")
                 try:
                     y, sr = load_audio_bytes(data, sr=DEFAULT_PARAMS["sr"])
+                    
+                    # --- APPLY THE ROBUSTNESS PIPELINE ON EACH FILE IN BATCH LOOP ---
+                    if pitch_semitones != 0:
+                        y = apply_pitch_shift(y, sr, pitch_semitones)
+                    
+                    if noise_level > -80:
+                        y = add_white_noise(y, noise_level)
+                    
                     paired, _single = fingerprint_audio(y, sr)
                     results = identify(paired, db, top_k=1)
                     prediction = results[0]["song_name"] if results else ""
