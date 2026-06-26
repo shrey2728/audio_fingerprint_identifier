@@ -46,7 +46,7 @@ exactly two columns: `filename, prediction` (prediction = matched song's
 filename without extension), downloadable directly from the app.
 
 ## Deploying on Streamlit Community Cloud
-App URL -> https://audiofingerprintidentifier-mwzf7xbdkxskcwyv8vl6qm.streamlit.app/
+App URL -> https://zapptain-america-50.streamlit.app/
 
 github repo -> https://github.com/shrey2728/audio_fingerprint_identifier.git
 ## Notes
